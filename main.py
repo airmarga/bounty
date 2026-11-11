@@ -24,8 +24,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 ALPHA = 1.5          # weight of log 24h growth in the order score
-MAX_R = 97           # starting ranks tracked in the transition tables
-TOPN = 97            # games given explicit probability rows
+MAX_R = 15           # starting ranks tracked in the transition tables
+TOPN = 15            # games given explicit probability rows (only ranks <= MAX_R get rows)
 PLACE_CAP = 0.8      # each place's named rows add up to at most this
 MIX = (0.15, 0.45, 0.4)   # weight of the 24h / 48h / 72h transition tables
 HORIZONS = (24, 48, 72)
