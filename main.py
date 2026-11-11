@@ -76,6 +76,9 @@ def main():
         score = math.log(playing) + ALPHA * math.log(max(growth, 0.05))
         scored.append((uid, score))
 
+    if not scored:
+        raise SystemExit("final chart has no playable games")
+
     scored.sort(key=lambda x: (-x[1], x[0]))
     sub = scored[:TOPN]
 
@@ -101,7 +104,7 @@ def main():
                 probabilities.append(
                     {"universe_id": int(uid), "place": k, "p": round(p, 9)})
 
-    # ensure exactly 10 distinct ids for top10
+    # ensure exactly `places` distinct ids for top10 (short charts still yield a full list)
     for uid, _ in sub:
         if len(top10) >= places:
             break
