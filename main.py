@@ -82,24 +82,57 @@ def main():
     scored.sort(key=lambda x: (-x[1], x[0]))
     sub = scored[:TOPN]
 
+    # Selection probability: softmax over scores. A game's probability is then spread
+    # across places with a wide Gaussian centered on its predicted rank. Each game's
+    # place-distribution sums to p_game <= 1, and each place's column sums are kept
+    # under 1 by the greedy column-cap pass below (the scorer rejects a place whose
+    # rows add to more than 1).
     mx = sub[0][1]
     exps = {uid: math.exp((s - mx) / TAU) for uid, s in sub}
     z = sum(exps.values())
     sel = {uid: e / z for uid, e in exps.items()}
+
+    p_game = {uid: min(sel[uid] * places * 0.9, 0.85) for uid, _ in sub}
+
+    w = {}
+    for i, (uid, s) in enumerate(sub, 1):
+        tot = 0.0
+        w[uid] = {}
+        for k in range(1, places + 1):
+            w[uid][k] = math.exp(-0.5 * ((i - k) / SIGMA) ** 2)
+            tot += w[uid][k]
+        for k in range(1, places + 1):
+            w[uid][k] /= tot  # game's place distribution sums to 1
+
+    # Greedy column cap: scale each row down just enough that no place exceeds 0.99.
+    CAP = 0.99
+    col = {k: 0.0 for k in range(1, places + 1)}
+    scaled = {}
+    for uid, s in sub:  # sub is score-descending: strongest games placed first
+        row = {k: w[uid][k] * p_game[uid] for k in range(1, places + 1)}
+        max_scale = 1.0
+        for k in range(1, places + 1):
+            room = CAP - col[k]
+            if room <= 0:
+                max_scale = 0.0
+                break
+            if row[k] * max_scale > room:
+                max_scale = min(max_scale, room / row[k])
+        if max_scale <= 0:
+            scaled[uid] = {k: 0.0 for k in range(1, places + 1)}
+            continue
+        for k in range(1, places + 1):
+            scaled[uid] = scaled.get(uid, {})
+            scaled[uid][k] = row[k] * max_scale
+            col[k] += scaled[uid][k]
 
     probabilities = []
     top10 = []
     for i, (uid, s) in enumerate(sub, 1):
         if i <= places:
             top10.append(uid)
-        tot = 0.0
-        w = {}
         for k in range(1, places + 1):
-            w[k] = math.exp(-0.5 * ((i - k) / SIGMA) ** 2)
-            tot += w[k]
-        p_game = min(sel[uid] * places, 0.95)
-        for k in range(1, places + 1):
-            p = w[k] / tot * p_game
+            p = scaled[uid][k]
             if p > 0:
                 probabilities.append(
                     {"universe_id": int(uid), "place": k, "p": round(p, 9)})
